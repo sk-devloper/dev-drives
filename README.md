@@ -11,7 +11,21 @@
 *   **Delete:** Remove a virtual drive image file.
 *   **List:** Display all managed virtual drives and their current status.
 
-## Installation
+## Quick Installation
+
+To quickly install `dev-drives` and make it available as a command-line tool, run the `install.sh` script:
+
+```bash
+./install.sh
+```
+
+This script will:
+1.  Check for `python3` and `pip`.
+2.  Install Python dependencies from `requirements.txt`.
+3.  Make `main.py` executable.
+4.  Create a symbolic link to `main.py` (named `dev-drives`) in `/usr/local/bin` or `~/.local/bin`, making it accessible from your terminal.
+
+## Manual Installation
 
 This project requires Python 3 and several system utilities.
 
@@ -29,11 +43,31 @@ This project requires Python 3 and several system utilities.
     ```
 
 3.  **Python Dependencies:**
-    Currently, there are no external Python dependencies beyond the standard library.
+    Install Python dependencies using pip:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4.  **Make `main.py` executable:**
+    ```bash
+    chmod +x main.py
+    ```
+
+5.  **Add to PATH (Optional):**
+    To run `dev-drives` from any directory, you can create a symbolic link in a directory that's in your system's PATH, for example:
+    ```bash
+    sudo ln -s "$(pwd)/main.py" /usr/local/bin/dev-drives
+    ```
 
 ## Usage
 
 All commands require root privileges to perform operations like creating, mounting, or deleting virtual drives.
+
+```bash
+sudo dev-drives <command> [arguments]
+```
+
+Or, if not installed via the script:
 
 ```bash
 sudo python3 main.py <command> [arguments]
