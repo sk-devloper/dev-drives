@@ -9,30 +9,48 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-echo "Starting dev-drives installation..."
+echo "Starting dev-drives installation with pyenv..."
+
+# --- 0. Check for pyenv ---
+if ! command -v pyenv &> /dev/null; then
+    echo "pyenv is not installed. Please install pyenv first (https://github.com/pyenv/pyenv#installation) and then re-run this script." >&2
+    exit 1
+fi
+
+# Ensure pyenv is initialized for the current shell
+export PYENV_ROOT="$HOME/.pyenv"
+export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init --path)"
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
 
 # --- 1. Install System Dependencies ---
 echo "Installing system dependencies..."
 apt update
 apt install -y util-linux e2fsprogs
 
-# --- 2. Setup Python Environment ---
-echo "Setting up Python environment..."
-PYTHON_BIN=$(which python3)
-if [ -z "$PYTHON_BIN" ]; then
-    echo "Python 3 is not installed. Please install Python 3 and try again." >&2
-    exit 1
+# --- 2. Setup Python Environment with pyenv ---
+echo "Setting up Python environment with pyenv..."
+PYTHON_VERSION="3.10.12" # Or another suitable version
+VENV_NAME="dev-drives-venv"
+
+# Install Python version if not already installed
+if ! pyenv versions --bare | grep -q "$PYTHON_VERSION"; then
+    echo "Installing Python $PYTHON_VERSION using pyenv..."
+    pyenv install "$PYTHON_VERSION"
 fi
 
-# Create a virtual environment in the project directory
-VENV_DIR="$(pwd)/.venv"
-if [ ! -d "$VENV_DIR" ]; then
-    echo "Creating virtual environment at $VENV_DIR"
-    $PYTHON_BIN -m venv "$VENV_DIR"
+# Create pyenv virtual environment if not already created
+if ! pyenv virtualenvs --bare | grep -q "$VENV_NAME"; then
+    echo "Creating pyenv virtual environment '$VENV_NAME' for Python $PYTHON_VERSION..."
+    pyenv virtualenv "$PYTHON_VERSION" "$VENV_NAME"
 fi
+
+# Set the local pyenv version for the project directory
+pyenv local "$VENV_NAME"
 
 # Activate the virtual environment for the current script
-source "$VENV_DIR/bin/activate"
+pyenv activate "$VENV_NAME"
 
 # Install Python dependencies (if any)
 if [ -f "requirements.txt" ]; then
@@ -47,9 +65,13 @@ echo "Creating 'drive' command..."
 WRAPPER_SCRIPT="/usr/local/bin/drive"
 PROJECT_DIR="$(pwd)" # Get the current project directory
 
+# Get the absolute path to the python executable within the pyenv virtual environment
+# This path will be used directly in the wrapper script to avoid sudo/pyenv environment issues.
+PYENV_VENV_PYTHON_EXEC="$(pyenv which python)"
+
 cat <<EOF > "$WRAPPER_SCRIPT"
 #!/bin/bash
-# This wrapper script executes the dev-drives main.py script.
+# This wrapper script executes the dev-drives main.py script using its pyenv virtual environment.
 
 # Ensure the script is run with sudo
 if [[ $EUID -ne 0 ]]; then
@@ -60,14 +82,9 @@ fi
 # Navigate to the project directory
 cd "$PROJECT_DIR"
 
-# Activate the virtual environment
-source "$VENV_DIR/bin/activate"
-
-# Execute the main script with sudo (already checked above)
-python3 main.py "$@"
-
-# Deactivate the virtual environment (optional, as script exits)
-deactivate
+# Execute the main script using the python executable from the pyenv virtual environment
+# This avoids issues with sudo and pyenv environment activation.
+"$PYENV_VENV_PYTHON_EXEC" main.py "$@"
 EOF
 
 chmod +x "$WRAPPER_SCRIPT"
